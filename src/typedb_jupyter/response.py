@@ -22,8 +22,8 @@
 import math
 from typedb.concept.answer.concept_map import ConceptMap
 from typedb.concept.answer.concept_map_group import ConceptMapGroup
-from typedb.concept.answer.numeric import Numeric
-from typedb.concept.answer.numeric_group import NumericGroup
+from typedb.concept.value.value import Value
+from typedb.concept.answer.value_group import ValueGroup
 from typedb_jupyter.exception import ArgumentError
 
 
@@ -38,11 +38,11 @@ class Response(object):
         if self.query.query_type == "match":
             return ConceptMap
         elif self.query.query_type == "match-aggregate":
-            return Numeric
+            return Value
         elif self.query.query_type == "match-group":
             return ConceptMapGroup
         elif self.query.query_type == "match-group-aggregate":
-            return NumericGroup
+            return ValueGroup
         elif self.query.query_type == "define":
             return None
         elif self.query.query_type == "undefine":
@@ -57,7 +57,7 @@ class Response(object):
     @staticmethod
     def _group_key(concept):
         if concept.is_type():
-            return concept.as_type().get_label().name()
+            return concept.as_type().get_label().name
         elif concept.is_entity():
             return concept.as_entity().get_iid()
         elif concept.is_relation():
@@ -70,17 +70,17 @@ class Response(object):
     @staticmethod
     def _format_json(answer, answer_type):
         if answer_type is ConceptMap:
-            return [concept_map.to_json() for concept_map in answer]
+            return [str(concept_map) for concept_map in answer]
         elif answer_type is ConceptMapGroup:
             return {Response._group_key(map_group.owner()): Response._format_json(map_group.concept_maps(), ConceptMap) for map_group in answer}
-        elif answer_type is Numeric:
+        elif answer_type is Value:
             if answer.is_int():
                 return answer.as_int()
             elif answer.is_float():
                 return answer.as_float()
             else:
                 return math.nan
-        elif answer_type is NumericGroup:
+        elif answer_type is ValueGroup:
             return {Response._group_key(numeric_group.owner()): Response._format_json(numeric_group.numeric(), Numeric) for numeric_group in answer}
         else:
             raise ValueError("Unknown answer type. Please report this error.")
@@ -91,7 +91,7 @@ class Response(object):
         binding_counts = dict()
 
         for result in results:
-            concept_map = result.map()
+            concept_map = result.map
 
             for binding in concept_map.keys():
                 if not concept_map[binding].is_thing():
@@ -114,23 +114,23 @@ class Response(object):
                     concepts[iid] = concept
 
         for concept in concepts.values():
-            concept["type"] = concept["object"].get_type().get_label().name()
+            concept["type"] = concept["object"].get_type().get_label().name
 
             if concept["object"].is_attribute():
-                concept["root-type"] = transaction.concepts().get_root_attribute_type().get_label().name()
+                concept["root-type"] = transaction.concepts.get_root_attribute_type().get_label().name
                 concept["value"] = concept["object"].as_attribute().get_value()
                 concept["value-type"] = str(concept["object"].get_type().get_value_type())
 
             if concept["object"].is_entity():
-                concept["root-type"] = transaction.concepts().get_root_entity_type().get_label().name()
-                ownerships = [attribute.get_iid() for attribute in concept["object"].as_remote(transaction).get_has()]
+                concept["root-type"] = transaction.concepts.get_root_entity_type().get_label().name
+                ownerships = [attribute.get_iid() for attribute in concept["object"].get_has(transaction)]
                 concept["ownerships"] = [concepts[iid]["binding"] for iid in ownerships if iid in concepts.keys()]
 
             if concept["object"].is_relation():
-                concept["root-type"] = transaction.concepts().get_root_relation_type().get_label().name()
-                ownerships = [attribute.get_iid() for attribute in concept["object"].as_remote(transaction).get_has()]
+                concept["root-type"] = transaction.concepts.get_root_relation_type().get_label().name
+                ownerships = [attribute.get_iid() for attribute in concept["object"].get_has(transaction)]
                 concept["ownerships"] = [concepts[iid]["binding"] for iid in ownerships if iid in concepts.keys()]
-                roleplayers = concept["object"].as_remote(transaction).get_players_by_role_type()
+                roleplayers = concept["object"].get_players_by_role_type(transaction)
                 concept["roleplayers"] = list()
 
                 for role in roleplayers.keys():
@@ -138,7 +138,7 @@ class Response(object):
                         iid = roleplayer.get_iid()
 
                         if iid in concepts.keys():
-                            concept["roleplayers"].append((role.get_label().name(), concepts[iid]["binding"]))
+                            concept["roleplayers"].append((role.get_label().name, concepts[iid]["binding"]))
 
             concept.pop("object")
 
@@ -180,7 +180,7 @@ class Response(object):
                         lines.append("${} ({});".format(binding, ", ".join(roleplayers)))
 
             return "\n".join(lines)
-        elif answer_type in (ConceptMapGroup, Numeric, NumericGroup):
+        elif answer_type in (ConceptMapGroup, Value, ValueGroup):
             raise ArgumentError("TypeQL output is not possible for group and aggregate queries.")
         else:
             raise ValueError("Unknown answer type. Please report this error.")

@@ -19,7 +19,7 @@
 # under the License.
 #
 
-from typedb.client import TypeDBOptions
+from typedb.driver import TypeDBOptions
 from typedb.api.connection.session import SessionType
 from typedb.api.connection.transaction import TransactionType
 from typedb_jupyter.connection import Connection
@@ -194,10 +194,7 @@ class Query(object):
                 raise ArgumentError("Incorrect transaction type provided. Transaction type must be 'read' or 'write'.")
 
     def _get_options(self, connection):
-        if connection.client.is_cluster():
-            return TypeDBOptions().cluster().set_infer(self.infer)
-        else:
-            return TypeDBOptions().core().set_infer(self.infer)
+        return TypeDBOptions(infer = self.infer)
 
     def _print_info(self, connection):
         connection_arg = "Connection: {}".format(connection.verbose_name)
@@ -235,23 +232,23 @@ class Query(object):
         try:
             with connection.session.transaction(self.transaction_type, options) as transaction:
                 if self.query_type == "match":
-                    answer = transaction.query().match(self.query)
+                    answer = transaction.query.get(self.query)
                 elif self.query_type == "match-aggregate":
-                    answer = transaction.query().match_aggregate(self.query).get()
+                    answer = transaction.query.match_aggregate(self.query).get()
                 elif self.query_type == "match-group":
-                    answer = transaction.query().match_group(self.query)
+                    answer = transaction.query.match_group(self.query)
                 elif self.query_type == "match-group-aggregate":
-                    answer = transaction.query().match_group_aggregate(self.query)
+                    answer = transaction.query.match_group_aggregate(self.query)
                 elif self.query_type == "define":
-                    answer = transaction.query().define(self.query)
+                    answer = transaction.query.define(self.query)
                 elif self.query_type == "undefine":
-                    answer = transaction.query().undefine(self.query)
+                    answer = transaction.query.undefine(self.query)
                 elif self.query_type == "insert":
-                    answer = transaction.query().insert(self.query)
+                    answer = transaction.query.insert(self.query)
                 elif self.query_type == "delete":
-                    answer = transaction.query().delete(self.query)
+                    answer = transaction.query.delete(self.query)
                 elif self.query_type == "update":
-                    answer = transaction.query().update(self.query)
+                    answer = transaction.query.update(self.query)
 
                 response = Response(self, answer, output_format, transaction)
 

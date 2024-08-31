@@ -19,7 +19,7 @@
 # under the License.
 #
 
-from typedb.client import TypeDB
+from typedb.driver import TypeDB
 from typedb.api.connection.session import SessionType
 from typedb_jupyter.exception import ArgumentError
 
@@ -40,16 +40,16 @@ class Connection(object):
             self.alias = alias
             self.verbose_name = "{} ({})".format(self.alias, self.name)
 
-        if client is TypeDB.core_client:
-            self.client = TypeDB.core_client(address)
-        elif client is TypeDB.cluster_client:
-            self.client = TypeDB.cluster_client(address, credential)
+        if client is TypeDB.core_driver:
+            self.client = TypeDB.core_driver(address)
+        elif client is TypeDB.cloud_driver:
+            self.client = TypeDB.cloud_driver(address, credential)
         else:
             raise ValueError("Unknown client type. Please report this error.")
 
-        if not self.client.databases().contains(database):
+        if not self.client.databases.contains(database):
             if create_database:
-                self.client.databases().create(database)
+                self.client.databases.create(database)
                 print("Created database: {}".format(self.database))
             else:
                 raise ArgumentError("Database with name '{}' does not exist and automatic database creation has been disabled.".format(database))
@@ -126,7 +126,7 @@ class Connection(object):
     @classmethod
     def set_session(cls, session_type, alias=None):
         connection = cls.get(alias)
-        if connection.session.session_type() != session_type:
+        if connection.session.type != session_type:
             connection.session.close()
             connection.session = connection.client.session(connection.database, session_type)
 
@@ -142,7 +142,7 @@ class Connection(object):
 
         if delete:
             connection.session.close()
-            connection.client.databases().get(connection.database).delete()
+            connection.client.databases.get(connection.database).delete()
             print("Deleted database: {}".format(connection.database))
 
         del cls.connections[connection.name]

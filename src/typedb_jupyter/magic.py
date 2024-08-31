@@ -25,7 +25,7 @@ from traitlets import Bool
 from IPython.core.magic import Magics, cell_magic, line_magic, magics_class, needs_local_scope
 from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
 from typedb.api.connection.credential import TypeDBCredential
-from typedb.client import TypeDB
+from typedb.driver import TypeDB
 from typedb_jupyter.connection import Connection
 from typedb_jupyter.query import Query
 from typedb_jupyter.exception import ArgumentError, QueryParsingError
@@ -96,10 +96,10 @@ class TypeDBMagic(Magics, Configurable):
                     Connection.select(args.alias)
             else:
                 if all(arg is None for arg in cluster_args):
-                    client = TypeDB.core_client
+                    client = TypeDB.core_driver
                     credential = None
                 elif all(arg is not None for arg in cluster_args):
-                    client = TypeDB.cluster_client
+                    client = TypeDB.cloud_driver
                     credential = TypeDBCredential(args.username, args.password, args.certificate)
                 else:
                     raise ArgumentError("Cannot open cluster connection without a username, password, and certificate path. Use -u, -p, and -c to specify these.")
