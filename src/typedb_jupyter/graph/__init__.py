@@ -19,15 +19,23 @@
 # under the License.
 #
 
-def visualise(typeql_query_string, typeql_result, visualiser=None):
-    from typedb_jupyter.graph.query import QueryGraph
-    from typedb_jupyter.graph.answer import AnswerGraph
-    from typedb_jupyter.utils.parser import TypeQLVisitor
+from typedb.analyze import Pipeline
+from typedb.driver import ConceptRow
+from typedb_graph_utils import NetworkXBuilder
+from typing import List
 
-    parsed = TypeQLVisitor.parse_and_visit(typeql_query_string)
-    query_graph = QueryGraph(parsed)
-    answer_graph = AnswerGraph.build(query_graph, typeql_result)
-    if visualiser is None:
-        from .answer import PlottableGraphBuilder
-        visualiser = PlottableGraphBuilder()
-    answer_graph.plot_with_visualiser(visualiser)
+def visualise(rows: List[ConceptRow]):
+    if len(rows) > 0:
+        pipeline = rows[0].query_structure()
+        if pipeline is None:
+            raise ValueError("rows must have query_structure. Use 'include_query_structure=True' in QueryOptions")
+        builder = NetworkXBuilder(pipeline)
+        for (i, answer) in enumerate(rows):
+            builder.add_answer(i, answer)
+        graph = builder.finish()
+    else:
+        from networkx import MultiDiGraph
+        graph = MultiDiGraph()
+    from .answer import PlottableGraphBuilder
+    visualiser = PlottableGraphBuilder.from_networkx(graph)
+    visualiser.plot_interactive_graph()

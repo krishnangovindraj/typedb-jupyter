@@ -20,219 +20,50 @@
 #
 
 from abc import abstractmethod
+from networkx import MultiDiGraph
 from typing import List, Any
 
-############
-# Vertices #
-############
-class AnswerVertex:
-    _SHAPE = None
-    _COLOUR = None
-    def __init__(self, vertex):
-        self.vertex = vertex
+from typedb_graph_utils import NetworkXBuilder
+from typedb_graph_utils.data_constraint import DataVertex, ConceptVertex, FunctionCallVertex, ExpressionVertex
+from typedb.driver import Entity, Relation, Attribute, EntityType,  RelationType, AttributeType
 
-    def iid(self):
-        return self.vertex.get_iid()
-
-    def type(self):
-        return self.vertex.get_type().get_label()
-
-    def __str__(self):
-        return str(self.vertex)
-
-    def __hash__(self):
-        return self.vertex.__hash__()
-
-    def __eq__(self, other):
-        return self.vertex.__eq__(other.vertex)
-
-    @classmethod
-    @abstractmethod
-    def _default_shape(cls):
-        return cls._SHAPE
-
-    @classmethod
-    @abstractmethod
-    def _default_colour(cls):
-        return cls._COLOUR
-
-    @abstractmethod
-    def _default_label(self):
-        raise NotImplementedError("abstract")
-
-    @classmethod
-    def trim_iid(cls, iid):
-        full_iid =  str(iid)
-        thing_id = full_iid[4:]
-        trimmed = thing_id.lstrip("0")
-        if len(trimmed) < 2:
-            return thing_id[-2:]
-        else:
-            return trimmed
-
-class RelationVertex(AnswerVertex):
-    _SHAPE = "d"
-    _COLOUR = "yellow"
-    def __init__(self, relation):
-        super().__init__(relation)
-
-    def _default_label(self):
-        trimmed_iid = self.__class__.trim_iid(self.vertex.get_iid())
-        return "{}[{}]".format(self.vertex.get_type().get_label(), trimmed_iid)
+class VertexStyle:
+    def __init__(self, shape, color, label_fn):
+        self.shape = shape
+        self.color = color
+        self.label_fn = label_fn
 
 
-class EntityVertex(AnswerVertex):
-    _SHAPE = "s"
-    _COLOUR = "pink"
-    def __init__(self, entity):
-        super().__init__(entity)
 
-    def _default_label(self):
-        trimmed_iid = self.__class__.trim_iid(self.vertex.get_iid())
-        return "{}[{}]".format(self.vertex.get_type().get_label(), trimmed_iid)
+def _entity_relation_label(vertex: ConceptVertex):
+        concept = vertex.concept
+        return f"{concept.get_type().get_label()}({concept.get_iid()[-4:]})"
 
+def _attribute_value_as_label(vertex: ConceptVertex):
+    concept = vertex.concept
+    return f"{concept.get_type().get_label()}({concept.get_value()})"
 
-class AttributeVertex(AnswerVertex):
-    _SHAPE = "o"
-    _COLOUR = "green"
+VERTEX_STYLES = {
+    FunctionCallVertex: VertexStyle("s", "grey", lambda x: x.name),
+    ExpressionVertex: VertexStyle("s", "grey", lambda x: x.text),
 
-    def __init__(self, attribute):
-        super().__init__(attribute)
+    Entity: VertexStyle("o", "pink", _entity_relation_label),
+    Relation: VertexStyle("s", "yellow", _entity_relation_label),
+    Attribute: VertexStyle("o", "green", _attribute_value_as_label),
 
-    def _default_label(self):
-        return "{}:{}".format(self.vertex.get_type().get_label(), self.vertex.get_value())
+    EntityType: VertexStyle("o", "maroon", str),
+    RelationType: VertexStyle("s", "darkyellow", str),
+    AttributeType: VertexStyle("o", "darkgreen", str),
+}
 
-    def iid(self):
-        return self.vertex.get_value()
+def _get_attributes(node: DataVertex) -> VertexStyle:
+    what = node.concept if isinstance(node, ConceptVertex) else node
+    found = [c for c in VERTEX_STYLES.keys() if c and isinstance(what, c)]
+    key = found[0] if len(found) > 0 else None
+    return VERTEX_STYLES[key]
 
-#########
-# Edges #
-#########
-class AnswerEdge:
-    def __init__(self, lhs: AnswerVertex, rhs: AnswerVertex):
-        self.lhs = lhs
-        self.rhs = rhs
-
-    @abstractmethod
-    def _default_label(self):
-        raise NotImplementedError("abstract")
-
-    def __str__(self):
-        return "{}--[{}]-->{}".format(self.lhs, self._default_label(), self.rhs)
-
-class HasEdge(AnswerEdge):
-    def _default_label(self):
-        return "has"
-
-
-class LinksEdge(AnswerEdge):
-    def __init__(self, lhs: AnswerVertex, rhs: AnswerVertex, role):
-        super().__init__(lhs, rhs)
-        self.role = role
-
-    def role(self):
-        self.role.get_label()
-
-    def _default_label(self):
-        return self.role.get_label().split(":")[1]
-
-##########
-# Graphs #
-##########
-class IGraphVisualisationBuilder:
-
-    @abstractmethod
-    def __init__(self):
-        raise NotImplementedError("abstract")
-
-    def notify_start_next_answer(self, index: int):
-        pass
-
-    @abstractmethod
-    def add_entity_vertex(self, answer_index: int, vertex: EntityVertex):
-        raise NotImplementedError("abstract")
-
-    @abstractmethod
-    def add_relation_vertex(self, answer_index: int, vertex: RelationVertex):
-        raise NotImplementedError("abstract")
-
-    @abstractmethod
-    def add_attribute_vertex(self, answer_index: int, vertex: AttributeVertex):
-        raise NotImplementedError("abstract")
-
-    @abstractmethod
-    def add_has_edge(self, answer_index: int, edge: HasEdge):
-        raise NotImplementedError("abstract")
-
-    @abstractmethod
-    def add_links_edge(self, answer_index: int, edge: LinksEdge):
-        raise NotImplementedError("abstract")
-
-    @abstractmethod
-    def plot(self) -> Any:
-        raise NotImplementedError("abstract")
-
-
-class AnswerGraph:
-    def __init__(self, edges: List[List[AnswerEdge]]):
-        self.edges = edges
-
-    @classmethod
-    def build(cls, query_graph, answers):
-        builder = AnswerGraphBuilder(query_graph)
-        for row in answers:
-            builder._add_answer_row(row)
-        return AnswerGraph(builder.answer_edges)
-
-    def plot(self):
-        return self.plot_with_visualiser(PlottableGraphBuilder())
-
-    def plot_with_visualiser(self, visualiser: IGraphVisualisationBuilder):
-        for (index, edge_list) in enumerate(self.edges):
-            visualiser.notify_start_next_answer(index)
-            for edge in edge_list:
-                self._plot_vertex(visualiser, index, edge.lhs)
-                self._plot_vertex(visualiser, index, edge.rhs)
-                self._plot_edge(visualiser, index, edge)
-        return visualiser.plot()
-
-    def _plot_vertex(self, visualiser: IGraphVisualisationBuilder, index: int, vertex: AnswerVertex):
-        if isinstance(vertex, EntityVertex):
-            visualiser.add_entity_vertex(index, vertex)
-        elif isinstance(vertex, RelationVertex):
-            visualiser.add_relation_vertex(index, vertex)
-        elif isinstance(vertex, AttributeVertex):
-            visualiser.add_attribute_vertex(index, vertex)
-        else:
-            raise ValueError(f"Unknown vertex type: {vertex}")
-
-    def _plot_edge(self, visualiser: IGraphVisualisationBuilder, index: int, edge: AnswerEdge):
-        if isinstance(edge, HasEdge):
-            visualiser.add_has_edge(index, edge)
-        elif isinstance(edge, LinksEdge):
-            visualiser.add_links_edge(index, edge)
-        else:
-            raise ValueError(f"Unknown edge type: {edge}")
-
-
-class AnswerGraphBuilder:
-    def __init__(self, query_graph):
-        self.query_graph = query_graph
-        self.answer_edges = []
-
-    #
-    # @classmethod
-    # def _filter_visualisable_edges(cls, query_graph):
-    #     query_graph # TODO
-
-    def _add_answer_row(self, row):
-        this_answer_edges = []
-        for query_edge in self.query_graph.edges:
-            this_answer_edges.append(query_edge.get_answer_edge(row))
-        self.answer_edges.append(this_answer_edges)
-
-
-class PlottableGraphBuilder(IGraphVisualisationBuilder):
+#
+class PlottableGraphBuilder:
     def __init__(self):
         self.edges = []
         self.edge_labels = {}
@@ -240,32 +71,18 @@ class PlottableGraphBuilder(IGraphVisualisationBuilder):
         self.node_colours = {}
         self.node_labels= {}
 
-    def _add_edge_defaults(self, edge: AnswerEdge):
-        self.edges.append((edge.lhs, edge.rhs))
-        self.edge_labels[(edge.lhs, edge.rhs)] = edge._default_label()
-
-    def _add_vertex_defaults(self, vertex: AnswerVertex):
-        self.node_shapes[vertex] = vertex._SHAPE
-        self.node_colours[vertex] = vertex._COLOUR
-        self.node_labels[vertex] = vertex._default_label()
-
-
-    def add_entity_vertex(self, answer_index: int, vertex: EntityVertex):
-        self._add_vertex_defaults(vertex)
-
-    def add_relation_vertex(self, answer_index: int, vertex: RelationVertex):
-        self._add_vertex_defaults(vertex)
-
-    def add_attribute_vertex(self, answer_index: int, vertex: AttributeVertex):
-        self._add_vertex_defaults(vertex)
-
-    def add_has_edge(self, answer_index: int, edge: HasEdge):
-        self._add_edge_defaults(edge)
-
-    def add_links_edge(self, answer_index: int, edge: LinksEdge):
-        self._add_edge_defaults(edge)
-
-    def plot(self):
+    @staticmethod
+    def from_networkx(graph: MultiDiGraph):
+        self = PlottableGraphBuilder()
+        node_attributes = {node: _get_attributes(node) for node in graph.nodes}
+        self.node_colours = {node: node_attributes[node].color for node in graph.nodes}
+        self.node_shapes = {node: node_attributes[node].shape for node in graph.nodes}
+        self.node_labels = {node: node_attributes[node].label_fn(node) for node in graph.nodes}
+        self.edge_labels = { (u,v): edge_type for (u, v, edge_type) in graph.edges(data="label")}
+        self.edges = [(u,v) for (u, v, edge_type) in graph.edges(data="label")]
+        return self
+        
+    def plot_interactive_graph(self):
         from netgraph import InteractiveGraph
         return InteractiveGraph(
             self.edges,

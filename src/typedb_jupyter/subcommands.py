@@ -79,9 +79,8 @@ class Connect(SubCommandBase):
         if cmd.action == "help":
             cls.print_help()
         elif cmd.action == "open":
-            driver = TypeDB.cloud_driver if cmd.kind == "cluster" else TypeDB.core_driver
             credential = Credentials(cmd.username, cmd.password)
-            Connection.open(driver, cmd.address, credential, bool(cmd.tls_enabled))
+            Connection.open(cmd.address, credential, bool(cmd.tls_enabled))
         elif cmd.action == "close":
             Connection.close()
         else:

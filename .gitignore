@@ -1,0 +1,14 @@
+# ide
+.vscode
+.idea
+
+.DS_Store
+
+# Python
+**/__pycache__
+**.pyc
+**.egg-info
+build
+.ipynb_checkpoints
+.venv
+dist

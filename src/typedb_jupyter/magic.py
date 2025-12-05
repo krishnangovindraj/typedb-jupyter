@@ -110,7 +110,8 @@ class TypeQLMagic(Magics, Configurable):
 
         self.shell.user_ns.update({self.QUERY_RESULT_VARIABLE: answer})
         self.shell.user_ns.update({self.QUERY_STRING_VARIABLE: query})
-        return answer
+        # return answer sets it to _, but it's already in QUERY_RESULT_VARIABLE. So we don't return and avoid the ugly printing
+        # return answer 
 
     def __init__(self, shell):
         Configurable.__init__(self, config=shell.config)
@@ -123,7 +124,8 @@ class TypeQLMagic(Magics, Configurable):
         from typedb.concept.answer.concept_row_iterator import ConceptRowIterator
         from typedb.concept.answer.concept_document_iterator import ConceptDocumentIterator
         from typedb.concept.answer.ok_query_answer import OkQueryAnswer
-        answer = transaction.query(query).resolve()
+        from typedb.driver import QueryOptions
+        answer = transaction.query(query, QueryOptions(include_query_structure=True)).resolve()
         if answer.is_concept_rows():
             return (ConceptRowIterator, list(answer.as_concept_rows()))
         elif answer.is_concept_documents():
