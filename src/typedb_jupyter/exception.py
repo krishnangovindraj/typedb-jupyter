@@ -23,9 +23,6 @@ class ArgumentError(ValueError):
     pass
 
 
-class QueryParsingError(ValueError):
-    pass
-
 class ConnectionError(BaseException):
     pass
 

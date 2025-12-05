@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Database",
 ]
 dependencies = [
-    "typedb-driver~=3.0.2",
+    "typedb-driver~=3.7.0",
     "netgraph~=4.13.2",
     "ipython",
     "typedb-graph-utils~=3.7.0"

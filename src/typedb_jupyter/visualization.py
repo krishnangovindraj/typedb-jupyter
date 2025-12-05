@@ -19,13 +19,33 @@
 # under the License.
 #
 
-from abc import abstractmethod
-from networkx import MultiDiGraph
-from typing import List, Any
 
+from networkx import MultiDiGraph
+from matplotlib import pyplot as plt
+from typing import List
+
+from typedb.driver import ConceptRow
 from typedb_graph_utils import NetworkXBuilder
 from typedb_graph_utils.data_constraint import DataVertex, ConceptVertex, FunctionCallVertex, ExpressionVertex
 from typedb.driver import Entity, Relation, Attribute, EntityType,  RelationType, AttributeType
+
+def visualize(rows: List[ConceptRow]):
+    if len(rows) > 0:
+        pipeline = rows[0].query_structure()
+        if pipeline is None:
+            raise ValueError("rows must have query_structure. Use 'include_query_structure=True' in QueryOptions")
+        builder = NetworkXBuilder(pipeline)
+        for (i, answer) in enumerate(rows):
+            builder.add_answer(i, answer)
+        graph = builder.finish()
+    else:
+        from networkx import MultiDiGraph
+        graph = MultiDiGraph()
+    visualiser = PlottableGraphBuilder.from_networkx(graph)
+    figure = plt.figure()
+    graph = visualiser.plot_interactive_graph()
+    # figure.show()
+
 
 class VertexStyle:
     def __init__(self, shape, color, label_fn):

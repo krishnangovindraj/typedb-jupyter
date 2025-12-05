@@ -25,8 +25,8 @@ from traitlets import Bool
 from IPython.core.magic import Magics, cell_magic, line_magic, magics_class, needs_local_scope
 from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
 from typedb_jupyter.connection import Connection
-from typedb_jupyter.exception import ArgumentError, QueryParsingError
-
+from typedb_jupyter.exception import ArgumentError
+from typedb_jupyter.visualization import visualize
 import typedb_jupyter.subcommands as subcommands
 
 @magics_class
@@ -36,7 +36,6 @@ class TypeDBMagic(Magics, Configurable):
         config=True,
         help="Create database when opening a connection if it does not already exist."
     )
-
 
     @line_magic("typedb")
     def execute(self, line=""):
@@ -89,6 +88,7 @@ class TypeQLMagic(Magics, Configurable):
     @needs_local_scope
     @cell_magic("typeql")
     @magic_arguments()
+    @argument('-o', '--out', default="print", help="'print' or 'graph'")
     def execute(self, line="", cell="", local_ns=None):
         if local_ns is None:
             local_ns = {}
@@ -106,7 +106,12 @@ class TypeQLMagic(Magics, Configurable):
         connection = Connection.get()
         tx = connection.get_active_transaction()
         answer_type, answer = self._run_query(tx, query)
-        self._print_answers(answer_type, answer)
+        if args.out == "graph":
+            visualize(answer)
+        elif args.out == "print":
+            self._print_answers(answer_type, answer)
+        else:
+            self._print_answers(answer_type, answer)
 
         self.shell.user_ns.update({self.QUERY_RESULT_VARIABLE: answer})
         self.shell.user_ns.update({self.QUERY_STRING_VARIABLE: query})
